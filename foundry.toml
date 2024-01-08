@@ -1,0 +1,31 @@
+# Full reference https://github.com/foundry-rs/foundry/tree/master/config
+[profile.default]
+auto_detect_solc = true
+block_timestamp = 1738389600
+bytecode_hash = "none"
+ffi = true
+fuzz = { runs = 256 }
+gas_reports = ["*"]
+libs = ["lib"]
+optimizer = true
+optimizer_runs = 8_192
+out = "out"
+solc = "0.8.21"
+src = "src"
+test = "test"
+verbosity = 1
+evm_version = "paris"
+fs_permissions = [{ access = "read-write", path = "./networks.json" }]
+
+[rpc_endpoints]
+goerli = "${GOERLI_RPC_URL}"
+mainnet = "${MAINNET_RPC_URL}"
+base = "${BASE_RPC_URL}"
+
+[profile.ci]
+fuzz = { runs = 65_536 }
+verbosity = 4
+
+[profile.optimized]
+via_ir = true
+optimizer_runs = 4_294_967_295

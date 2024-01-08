@@ -1,0 +1,29 @@
+{
+  "[solidity]": {
+    "editor.tabSize": 4
+  },
+  "[javascript]": {
+    "editor.tabSize": 2
+  },
+  "editor.formatOnSave": true,
+  "files.exclude": {
+    "**/.DS_Store": true,
+    "**/.git": true,
+    "**/.hg": true,
+    "**/.svn": true,
+    "**/CVS": true,
+    "**/Thumbs.db": true,
+    ".yarn": true,
+    "broadcast": true,
+    "cache": true,
+    "node_modules": true,
+    "out": true,
+    "docs": true,
+    "build": true
+  },
+  "files.associations": {
+    ".gas-snapshot": "julia"
+  },
+  "solidity-va.codelens.graphThis.enable": false,
+  "solidity-va.codelens.unittestStub.enable": false
+}

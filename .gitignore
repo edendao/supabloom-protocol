@@ -1,0 +1,25 @@
+# directories
+.yarn/
+cache/
+node_modules/
+lib/*/node_modules/
+out/
+
+# files
+build/
+project.zip
+*.env
+*.log
+.DS_Store
+.pnp.*
+yarn-debug.log*
+yarn-error.log*
+
+# broadcasts
+broadcast/
+
+subgraph.yaml
+
+.env*
+
+.vscode/bookmarks.json

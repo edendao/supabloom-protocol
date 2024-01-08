@@ -1,0 +1,8 @@
+@script/=script/
+@openzeppelin/=node_modules/@openzeppelin/
+@solidstate/=lib/solidstate-solidity/contracts/
+@eas/=lib/eas-contracts/contracts/
+@recoverable/=lib/recoverable-wrapper/contracts/
+~/=src/
+forge-std/=lib/forge-std/src/
+solady/=lib/solady/src/

@@ -1,0 +1,6 @@
+# directories
+lib/**/*.sol
+node_modules/**/*.sol
+test/**/*.sol
+script/**/*.sol
+sdk/interfaces/*.sol
