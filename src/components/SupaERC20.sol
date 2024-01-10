@@ -67,7 +67,7 @@ contract SupaERC20 is
         super._beforeTokenTransfer(from, to, amount);
     }
 
-    function mint(address receiver, uint256 amount) public onlyOwner {
+    function mint(address receiver, uint256 amount) external onlyOwner {
         ERC20BaseStorage.layout().balances[receiver] += amount;
         emit Minted(receiver, amount);
     }
