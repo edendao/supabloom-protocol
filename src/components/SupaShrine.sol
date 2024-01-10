@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.11;
 
-import { IERC20 } from "forge-std/interfaces/IERC20.sol";
-import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
-import {
-    ReentrancyGuard
-} from "@solidstate/security/reentrancy_guard/ReentrancyGuard.sol";
-import { SupaERC20 } from "./SupaERC20.sol";
+import {IERC20} from "forge-std/interfaces/IERC20.sol";
+import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
+import {ReentrancyGuard} from "@solidstate/security/reentrancy_guard/ReentrancyGuard.sol";
+import {SupaERC20} from "./SupaERC20.sol";
 
 /// @title SupaShrine
 /// @author zefram.eth, cyrusofeden.eth, tabish.eth
@@ -28,10 +26,7 @@ contract SupaShrine is ReentrancyGuard {
     /// -----------------------------------------------------------------------
 
     event Offer(
-        address indexed sender,
-        address indexed claimToken,
-        address indexed token,
-        uint256 amount
+        address indexed sender, address indexed claimToken, address indexed rewardToken, uint256 rewardTokenAmount
     );
     event Claim(
         address recipient,
@@ -39,7 +34,7 @@ contract SupaShrine is ReentrancyGuard {
         uint256 snapshotId,
         address indexed token,
         address indexed receiver,
-        uint256 claimedTokenAmount
+        uint256 claimedRewardTokenAmount
     );
     event TransferReceiverStatus(address indexed receiver, address recipient);
 
@@ -61,11 +56,13 @@ contract SupaShrine is ReentrancyGuard {
     /// -----------------------------------------------------------------------
     /// Storage variables
     /// -----------------------------------------------------------------------
-    mapping(address claimToken => mapping(uint256 snapshotId => mapping(address rewardToken => uint256)))
-        public rewardedTokens;
+    mapping(address claimToken => mapping(uint256 snapshotId => mapping(address rewardToken => uint256))) public
+        rewardedTokens;
 
-    mapping(address claimToken => mapping(uint256 snapshotId => mapping(address rewardToken => mapping(address receiver => uint256))))
-        public claimedRewardTokens;
+    mapping(
+        address claimToken
+            => mapping(uint256 snapshotId => mapping(address rewardToken => mapping(address receiver => uint256)))
+    ) public claimedRewardTokens;
 
     mapping(address receiver => address) public receiverClaimRightOwner;
 
@@ -84,22 +81,12 @@ contract SupaShrine is ReentrancyGuard {
     /// @param claimToken The SupaERC20 token holders to reward
     /// @param rewardToken The ERC-20 token being offered to the Shrine
     /// @param rewardAmount The amount of tokens to offer
-    function reward(
-        address claimToken,
-        address rewardToken,
-        uint256 rewardAmount
-    ) external {
+    function reward(address claimToken, address rewardToken, uint256 rewardAmount) external {
         // distribute tokens to Receivers
-        rewardedTokens[claimToken][SupaERC20(claimToken).incrementSnapshot()][
-            rewardToken
-        ] += rewardAmount;
+        uint256 snapshotId = SupaERC20(claimToken).incrementSnapshot();
+        rewardedTokens[claimToken][snapshotId][rewardToken] += rewardAmount;
         // transfer tokens from sender
-        SafeTransferLib.safeTransferFrom(
-            rewardToken,
-            msg.sender,
-            address(this),
-            rewardAmount
-        );
+        SafeTransferLib.safeTransferFrom(rewardToken, msg.sender, address(this), rewardAmount);
 
         emit Offer(msg.sender, claimToken, rewardToken, rewardAmount);
     }
@@ -109,42 +96,32 @@ contract SupaShrine is ReentrancyGuard {
     /// Only callable by the receiver (if the right was never transferred) or the owner
     /// (that the original receiver transferred their rights to)
     /// @param claimInfo The info of the claim
-    /// @return claimedTokenAmount The amount of tokens claimed
-    function claim(
-        address recipient,
-        ClaimInfo calldata claimInfo
-    ) public returns (uint256 claimedTokenAmount) {
+    /// @return claimedRewardTokenAmount The amount of tokens claimed
+    function claim(address recipient, ClaimInfo calldata claimInfo) public returns (uint256 claimedRewardTokenAmount) {
         // verify sender auth
         _verifyReceiverOwnership(claimInfo.receiver);
 
         // compute claimable amount
-        uint256 receiverClaimedRewardTokens = claimedRewardTokens[
-            claimInfo.claimToken
-        ][claimInfo.snapshotId][claimInfo.rewardToken][claimInfo.receiver];
-        claimedTokenAmount = _computeClaimableTokenAmount(
+        uint256 receiverClaimedRewardTokens =
+            claimedRewardTokens[claimInfo.claimToken][claimInfo.snapshotId][claimInfo.rewardToken][claimInfo.receiver];
+
+        uint256 claimTokenBalance =
+            SupaERC20(claimInfo.claimToken).balanceOfAt(claimInfo.receiver, claimInfo.snapshotId);
+
+        claimedRewardTokenAmount = _computeClaimableTokenAmount(
             claimInfo.snapshotId,
             claimInfo.claimToken,
             claimInfo.rewardToken,
-            SupaERC20(claimInfo.claimToken).balanceOfAt(
-                claimInfo.receiver,
-                claimInfo.snapshotId
-            ),
+            claimTokenBalance,
             receiverClaimedRewardTokens
         );
 
         // record total tokens claimed by the receiver
-        claimedRewardTokens[claimInfo.claimToken][claimInfo.snapshotId][
-            claimInfo.rewardToken
-        ][claimInfo.receiver] =
-            receiverClaimedRewardTokens +
-            claimedTokenAmount;
+        claimedRewardTokens[claimInfo.claimToken][claimInfo.snapshotId][claimInfo.rewardToken][claimInfo.receiver] =
+            receiverClaimedRewardTokens + claimedRewardTokenAmount;
 
         // transfer tokens to the recipient
-        SafeTransferLib.safeTransfer(
-            claimInfo.rewardToken,
-            recipient,
-            claimedTokenAmount
-        );
+        SafeTransferLib.safeTransfer(claimInfo.rewardToken, recipient, claimedRewardTokenAmount);
 
         emit Claim(
             recipient,
@@ -152,16 +129,16 @@ contract SupaShrine is ReentrancyGuard {
             claimInfo.snapshotId,
             claimInfo.rewardToken,
             claimInfo.receiver,
-            claimedTokenAmount
+            claimedRewardTokenAmount
         );
     }
 
     /// @notice A variant of {claim} that combines multiple claims for the
     ///         same Receiver & snapshotId into a single call.
-    function claimMultipleTokensForReceiver(
-        address recipient,
-        ClaimInfo[] calldata claimInfo
-    ) external returns (uint256[] memory claimedTokenAmountList) {
+    function claimMultipleTokensForReceiver(address recipient, ClaimInfo[] calldata claimInfo)
+        external
+        returns (uint256[] memory claimedTokenAmountList)
+    {
         claimedTokenAmountList = new uint256[](claimInfo.length);
         for (uint256 i = 0; i < claimInfo.length; i++) {
             // verify sender auth
@@ -179,10 +156,7 @@ contract SupaShrine is ReentrancyGuard {
     /// (that the original receiver transferred their rights to)
     /// @param receiver The receiver whose claim rights will be transferred away
     /// @param newOwner The address that will receive all rights of the receiver
-    function transferReceiverClaimRight(
-        address receiver,
-        address newOwner
-    ) external {
+    function transferReceiverClaimRight(address receiver, address newOwner) external {
         // verify sender auth
         _verifyReceiverOwnership(receiver);
 
@@ -209,11 +183,7 @@ contract SupaShrine is ReentrancyGuard {
         uint256 shares
     ) public view returns (uint256 claimableTokenAmount) {
         claimableTokenAmount = _computeClaimableTokenAmount(
-            snapshot,
-            claimToken,
-            rewardToken,
-            shares,
-            claimedRewardTokens[claimToken][snapshot][rewardToken][receiver]
+            snapshot, claimToken, rewardToken, shares, claimedRewardTokens[claimToken][snapshot][rewardToken][receiver]
         );
     }
 
@@ -228,9 +198,9 @@ contract SupaShrine is ReentrancyGuard {
             address rightsOwner = receiverClaimRightOwner[receiver];
             if (
                 // claim right not transferred, sender should be the receiver
-                (rightsOwner == address(0) && msg.sender != receiver) ||
+                (rightsOwner == address(0) && msg.sender != receiver)
                 // claim right transferred, sender should be the owner
-                msg.sender != rightsOwner
+                || msg.sender != rightsOwner
             ) {
                 revert NotAuthorized();
             }
@@ -246,14 +216,10 @@ contract SupaShrine is ReentrancyGuard {
         uint256 claimedTokenAmount
     ) internal view returns (uint256 claimableTokenAmount) {
         uint256 totalShares = SupaERC20(claimToken).totalSupplyAt(snapshot);
-        uint256 offeredTokenAmount = (rewardedTokens[claimToken][snapshot][
-            rewardToken
-        ] * shares) / totalShares;
+        uint256 offeredTokenAmount = (rewardedTokens[claimToken][snapshot][rewardToken] * shares) / totalShares;
 
         // rounding may cause (offeredTokenAmount < claimedTokenAmount)
         // don't want to revert because of it
-        claimableTokenAmount = offeredTokenAmount >= claimedTokenAmount
-            ? offeredTokenAmount - claimedTokenAmount
-            : 0;
+        claimableTokenAmount = offeredTokenAmount >= claimedTokenAmount ? offeredTokenAmount - claimedTokenAmount : 0;
     }
 }
