@@ -22,7 +22,7 @@ contract MultiDimensionalImpactCreditsTest is TestSystem {
         // verify that this deployed a SupaERC20 and minted `totalSupply` tokens to the receiver
     }
 
-    function testAccreditingImpact() public {
+    function testRewardingImpact() public {
         // create a claim attestation with EAS with the receiver set to this contract
         // warp the timestamp forward to the future
 

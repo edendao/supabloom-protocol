@@ -5,69 +5,53 @@ import {TestSystem} from "./mixins/TestSystem.sol";
 
 contract SystemSpecTest is TestSystem {
     function setUp() public {
-        // Set up a schema for claims with EAS through our controller
-        // The first 2 fields of the schema should be the token name, symbol
+        // Set up a schema for claims with EAS
+        // register the schema with our controller with a token name and symbol
+        //    this deploys the token but does not mint
+        //    use OwnableRoles
 
-        // Set up a schema for validations with EAS through our controller
-        // The first 2 fields of the schema should be the token name, and symbol
+        // Set up a schema for validations with EAS
+        // register the schema with our controller with a token name and symbol
+        //    this deploys the token but does not mint
     }
 
     function testClaiming() public {
-        // create a claim attestation with EAS through our controller
-        // claim should use the claim schema and the first field should be the uint256 totalSupply
-        // verify that claim is not revocable
+        // create a claim attestation with EAS
+        // claim should use the claim schema and the uint256 field is the amount of the token to mint
         // call our controller contract with the claimAttestationID and a receiver address
-        // verify that this deployed a SupaERC20 and minted `totalSupply` tokens to the receiver
+        //      our controller contract verifies that the claim is not revocable
+        // assert that this deployed a SupaERC20 and minted `amount` tokens to the receiver
     }
 
     function testClaimingIdempotency() public {
-        // call `testClaims()` a few times and verify that only a single ERC20 was deployed
+        // call `testClaims()` a few times and verify that only a single ERC20 was deployed,
+        // and mint only happened once
     }
 
-    function testAccrediting() public {
-        // create a claim attestation with EAS with the receiver set to this contract
-        // distribute some claim ERC20s to some addresses
+    function testRewarding() public {
+        // PART 1 — CLAIMING ==================
+        // create a claim attestation with EAS
+        // controller.claim(claimAttestationID, address receiver)
+        //    this mints claim ERC20s to the receiver address, for this test, use address(this) (this test contract)
+        // distribute some claim ERC20s to 3 addresses
 
-        // use the controller to create a validation attestation
-        // verify that the attestation is revocable
-        // verify that this deployed a SupaERC20 and offered `reward` to the current snapshot of the claim's ERC20
-        // verify that a new snapshot was taken of the claim's ERC20
-        // verify that the various holders of the claim ERC20s can claim their pro-rata reward
+        // PART 2 — Rewarding ==============
+        // create a "reward attestation" on EAS => this is an attestation with refUID = claimAttestationID
+        // controller.reward(rewardAttestationID, uint256 rewardAmount)
+        //    this mints credit `rewardAmount` ERC20s, and calls SupaShrine.reward(claimERC20Token, creditERC20Token, rewardAmount)
+
+        // assert that a new snapshot was taken of the claimToken ERC20
+        // assert that the various holders of the claimToken ERC20s can claim their pro-rata reward
+
+        // prank the holders and claim the reward tokens
+        // assert they got what they should have got
     }
 
-    function testAccreditingIdempotency() public {
-        // call `testValidations()` a few times and verify that only a single 'CreditERC20' was deployed
+    function testRewardingIdempotency() public {
+        // verify that claimToken holders cannot claim from the shrine more than once
     }
 
-    function testAccreditingAcrossSnapshots() public {
-        // create a claim attestation with EAS with the receiver set to this contract
-        // use the controller to create a validation attestation
-        // verify that the attestation is revocable
-        // verify that a new snapshot was taken of the claim's ERC20
-        // verify that this deployed a SupaERC20 and offered `reward` to the current snapshot of the claim's ERC20
-
-        // move some tokens around
-        // manually update the snapshot on the ERC20
-
-        // use the controller to create a validation attestation
-        // verify that the attestation is revocable
-        // verify that a new snapshot was taken of the claim's ERC20
-        // verify that this deployed a SupaERC20 and offered `reward` to the current snapshot of the claim's ERC20
-    }
-
-    function testRevokingAccreditation() public {
-        // create a claim attestation with EAS with the receiver set to this contract
-        // distribute the claim ERC20s to a total of 3 addresses
-
-        // use the controller to create a validation attestation
-        // verify that the attestation is revocable
-        // verify that this deployed a SupaERC20 and offered `reward` to the current snapshot of the claim's ERC20
-        // verify that a new snapshot was taken of the claim's ERC20
-        // verify that the various holders of the claim ERC20s can claim their pro-rata reward
-        // claim the reward for 2/3 of the holders
-
-        // revoke the validation attestation through our controller
-        // verify that 2/3 credit ERC20 holders no longer hold any tokens
-        // verify that the remaining 1/3 credit ERC20 holder cannot claim any reward
+    function testRewardingAcrossSnapshots() public {
+        // this is the same as testRewarding() but move tokens around and take a few snapshots between Part 1 and Part 2 and verify that it all works
     }
 }

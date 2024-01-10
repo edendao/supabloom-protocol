@@ -19,7 +19,7 @@ contract ImpactTranchesTest is TestSystem {
         // verify that this deployed a SupaERC20 and minted `totalSupply` tokens to the receiver
     }
 
-    function testAccreditingTranches() public {
+    function testRewardingTranches() public {
         // create a claim attestation for tranches AAA with EAS with the receiver set to this contract
         // create a claim attestation for tranches AA with EAS with the receiver set to this contract
         // create a claim attestation for tranches A with EAS with the receiver set to this contract

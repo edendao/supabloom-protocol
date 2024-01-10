@@ -4,5 +4,5 @@ pragma solidity 0.8.21;
 import {TestBase} from "./TestBase.sol";
 
 abstract contract TestSystem is TestBase {
-// inherit 1. and 2. tests from this class
+// 1. and 2. tests inherit from this
 }

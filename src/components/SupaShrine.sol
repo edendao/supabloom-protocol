@@ -8,8 +8,8 @@ import {SupaERC20} from "./SupaERC20.sol";
 
 /// @title SupaShrine
 /// @author zefram.eth, cyrusofeden.eth
-/// A Champion can transfer their right to claim all future tokens offered to
-/// the Champion to another address.
+/// A Receiver can transfer their right to claim all future tokens offered to
+/// the Receiver to another address.
 contract SupaShrine is ReentrancyGuard {
     /// -----------------------------------------------------------------------
     /// Errors
@@ -25,17 +25,16 @@ contract SupaShrine is ReentrancyGuard {
     /// Events
     /// -----------------------------------------------------------------------
 
-    event Offer(address indexed sender, SupaERC20 indexed source, address indexed token, uint256 amount);
+    event Offer(address indexed sender, address indexed claimToken, address indexed token, uint256 amount);
     event Claim(
         address recipient,
-        SupaERC20 indexed source,
+        address indexed claimToken,
         uint256 snapshotId,
         address indexed token,
-        address indexed champion,
+        address indexed receiver,
         uint256 claimedTokenAmount
     );
-    event ClaimFromMetaShrine(SupaShrine indexed metaShrine);
-    event TransferChampionStatus(address indexed champion, address recipient);
+    event TransferReceiverStatus(address indexed receiver, address recipient);
 
     /// -----------------------------------------------------------------------
     /// Structs
@@ -43,34 +42,27 @@ contract SupaShrine is ReentrancyGuard {
 
     /// @param snapshotId Snapshot ID
     /// @param token The ERC-20 token to be claimed
-    /// @param champion The Champion address. If the Champion rights
+    /// @param receiver The Receiver address. If the Receiver rights
     ///                 have been transferred, the tokens will be sent to its owner.
     struct ClaimInfo {
         uint256 snapshotId;
-        address token;
-        address champion;
-    }
-
-    /// @param metaShrine The shrine to claim from
-    /// @param snapshotId Snapshot ID
-    /// @param token The ERC-20 token to be claimed
-    struct MetaShrineClaimInfo {
-        SupaShrine metaShrine;
-        uint256 snapshotId;
-        address token;
+        address claimToken;
+        address rewardToken;
+        address receiver;
     }
 
     /// -----------------------------------------------------------------------
     /// Storage variables
     /// -----------------------------------------------------------------------
+    mapping(address claimToken => mapping(uint256 snapshotId => mapping(address rewardToken => uint256))) public
+        rewardedTokens;
+
     mapping(
-        SupaERC20 source
-            => mapping(uint256 snapshotId => mapping(address token => mapping(address champion => uint256)))
+        address claimToken
+            => mapping(uint256 snapshotId => mapping(address rewardToken => mapping(address receiver => uint256)))
     ) public claimedTokens;
 
-    mapping(SupaERC20 source => mapping(uint256 snapshotId => mapping(address token => uint256))) public offeredTokens;
-
-    mapping(address champion => address) public championClaimRightOwner;
+    mapping(address receiver => address) public receiverClaimRightOwner;
 
     /// -----------------------------------------------------------------------
     /// Initialization
@@ -82,150 +74,128 @@ contract SupaShrine is ReentrancyGuard {
     /// User actions
     /// -----------------------------------------------------------------------
 
-    /// @notice Offer ERC-20 tokens to the Shrine and distribute them to Champions proportional
+    /// @notice Offer ERC-20 tokens to the Shrine and distribute them to Receivers proportional
     /// to their shares in the Shrine. Callable by anyone.
-    /// @param source The SupaERC20 token holders to reward
+    /// @param claimToken The SupaERC20 token holders to reward
     /// @param rewardToken The ERC-20 token being offered to the Shrine
     /// @param amount The amount of tokens to offer
-    function offer(SupaERC20 source, address rewardToken, uint256 amount) external {
-        // distribute tokens to Champions
-        offeredTokens[source][source.incrementSnapshot()][rewardToken] += amount;
+    function reward(address claimToken, address rewardToken, uint256 rewardAmount) external {
+        // distribute tokens to Receivers
+        rewardedTokens[claimToken][SupaERC20(claimToken).incrementSnapshot()][rewardToken] += rewardAmount;
         // transfer tokens from sender
-        SafeTransferLib.safeTransferFrom(rewardToken, msg.sender, address(this), amount);
+        SafeTransferLib.safeTransferFrom(rewardToken, msg.sender, address(this), rewardAmount);
 
-        emit Offer(msg.sender, source, rewardToken, amount);
+        emit Offer(msg.sender, claimToken, rewardToken, rewardAmount);
     }
 
-    /// @notice A Champion or the owner of a Champion may call this to
+    /// @notice A Receiver or the owner of a Receiver may call this to
     ///         claim their share of the tokens offered to this Shrine.
-    /// Only callable by the champion (if the right was never transferred) or the owner
-    /// (that the original champion transferred their rights to)
+    /// Only callable by the receiver (if the right was never transferred) or the owner
+    /// (that the original receiver transferred their rights to)
     /// @param claimInfo The info of the claim
     /// @return claimedTokenAmount The amount of tokens claimed
     function claim(address recipient, ClaimInfo calldata claimInfo) external returns (uint256 claimedTokenAmount) {
         // verify sender auth
-        _verifyChampionOwnership(claimInfo.champion);
+        _verifyReceiverOwnership(claimInfo.receiver);
 
         // compute claimable amount
-        uint256 championClaimedTokens = claimedTokens[claimInfo.snapshotId][claimInfo.token][claimInfo.champion];
+        uint256 receiverClaimedTokens =
+            claimedTokens[claimInfo.claimToken][claimInfo.snapshotId][claimInfo.rewardToken][claimInfo.receiver];
         claimedTokenAmount = _computeClaimableTokenAmount(
-            claimInfo.snapshotId, claimInfo.token, source.totalSupplyAt(claimInfo.snapshotId), championClaimedTokens
+            claimInfo.snapshotId,
+            claimInfo.rewardToken,
+            SupaERC20(claimInfo.rewardToken).totalSupplyAt(claimInfo.snapshotId),
+            receiverClaimedTokens
         );
 
-        // record total tokens claimed by the champion
-        claimedTokens[claimInfo.snapshotId][claimInfo.token][claimInfo.champion] =
-            championClaimedTokens + claimedTokenAmount;
+        // record total tokens claimed by the receiver
+        claimedTokens[claimInfo.claimToken][claimInfo.snapshotId][claimInfo.rewardToken][claimInfo.receiver] =
+            receiverClaimedTokens + claimedTokenAmount;
 
         // transfer tokens to the recipient
-        SafeTransferLib.safeTransfer(claimInfo.token, recipient, claimedTokenAmount);
+        SafeTransferLib.safeTransfer(claimInfo.rewardToken, recipient, claimedTokenAmount);
 
-        emit Claim(recipient, claimInfo.snapshotId, claimInfo.token, claimInfo.champion, claimedTokenAmount);
+        emit Claim(recipient, claimInfo.snapshotId, claimInfo.rewardToken, claimInfo.receiver, claimedTokenAmount);
     }
 
     /// @notice A variant of {claim} that combines multiple claims for the
-    ///         same Champion & snapshotId into a single call.
-    function claimMultipleTokensForChampion(
+    ///         same Receiver & snapshotId into a single call.
+    function claimMultipleTokensForReceiver(
         address recipient,
         uint256 snapshot,
         address[] calldata tokenList,
-        address champion,
+        address receiver,
         uint256 shares
     ) external returns (uint256[] memory claimedTokenAmountList) {
         // verify sender auth
-        _verifyChampionOwnership(champion);
+        _verifyReceiverOwnership(receiver);
 
         claimedTokenAmountList = new uint256[](tokenList.length);
         for (uint256 i = 0; i < tokenList.length; i++) {
             // compute claimable amount
-            uint256 championClaimedTokens = claimedTokens[snapshot][tokenList[i]][champion];
+            uint256 receiverClaimedTokens = claimedTokens[snapshot][tokenList[i]][receiver];
             claimedTokenAmountList[i] =
-                _computeClaimableTokenAmount(snapshot, tokenList[i], shares, championClaimedTokens);
+                _computeClaimableTokenAmount(snapshot, tokenList[i], shares, receiverClaimedTokens);
 
-            // record total tokens claimed by the champion
-            claimedTokens[snapshot][tokenList[i]][champion] = championClaimedTokens + claimedTokenAmountList[i];
+            // record total tokens claimed by the receiver
+            claimedTokens[snapshot][tokenList[i]][receiver] = receiverClaimedTokens + claimedTokenAmountList[i];
         }
 
         for (uint256 i = 0; i < tokenList.length; i++) {
             // transfer tokens to the recipient
             SafeTransferLib.safeTransfer(tokenList[i], recipient, claimedTokenAmountList[i]);
 
-            emit Claim(recipient, snapshot, tokenList[i], champion, claimedTokenAmountList[i]);
+            emit Claim(recipient, snapshot, tokenList[i], receiver, claimedTokenAmountList[i]);
         }
     }
 
-    /// @notice If this Shrine is a Champion of another Shrine (MetaShrine),
-    ///         calling this can claim the tokens
-    /// from the MetaShrine and distribute them to this Shrine's Champions. Callable by anyone.
-    /// @param claimInfo The info of the claim
-    /// @return claimedTokenAmount The amount of tokens claimed
-    function claimFromMetaShrine(MetaShrineClaimInfo calldata claimInfo)
-        external
-        nonReentrant
-        returns (uint256 claimedTokenAmount)
-    {
-        return _claimFromMetaShrine(claimInfo);
-    }
-
-    /// @notice A variant of {claimFromMetaShrine} that combines multiple claims into a single call.
-    function claimMultipleFromMetaShrine(MetaShrineClaimInfo[] calldata claimInfoList)
-        external
-        nonReentrant
-        returns (uint256[] memory claimedTokenAmountList)
-    {
-        // claim and distribute tokens
-        claimedTokenAmountList = new uint256[](claimInfoList.length);
-        for (uint256 i = 0; i < claimInfoList.length; i++) {
-            claimedTokenAmountList[i] = _claimFromMetaShrine(claimInfoList[i]);
-        }
-    }
-
-    /// @notice Allows a champion to transfer their right to claim from this shrine to
-    /// another address. The champion will effectively lose their shrine membership, so
+    /// @notice Allows a receiver to transfer their right to claim from this shrine to
+    /// another address. The receiver will effectively lose their shrine membership, so
     /// make sure the new owner is a trusted party.
-    /// Only callable by the champion (if the right was never transferred) or the owner
-    /// (that the original champion transferred their rights to)
-    /// @param champion The champion whose claim rights will be transferred away
-    /// @param newOwner The address that will receive all rights of the champion
-    function transferChampionClaimRight(address champion, address newOwner) external {
+    /// Only callable by the receiver (if the right was never transferred) or the owner
+    /// (that the original receiver transferred their rights to)
+    /// @param receiver The receiver whose claim rights will be transferred away
+    /// @param newOwner The address that will receive all rights of the receiver
+    function transferReceiverClaimRight(address receiver, address newOwner) external {
         // verify sender auth
-        _verifyChampionOwnership(champion);
+        _verifyReceiverOwnership(receiver);
 
-        championClaimRightOwner[champion] = newOwner;
-        emit TransferChampionStatus(champion, newOwner);
+        receiverClaimRightOwner[receiver] = newOwner;
+        emit TransferReceiverStatus(receiver, newOwner);
     }
 
     /// -----------------------------------------------------------------------
     /// Getters
     /// -----------------------------------------------------------------------
 
-    /// @notice Computes the amount of a particular ERC-20 token claimable by a Champion from
+    /// @notice Computes the amount of a particular ERC-20 token claimable by a Receiver from
     /// a particular snapshotId
     /// @param snapshot Snapshot ID
     /// @param token The ERC-20 token to be claimed
-    /// @param champion The Champion address
-    /// @param shares The share amount of the Champion
+    /// @param receiver The Receiver address
+    /// @param shares The share amount of the Receiver
     /// @return claimableTokenAmount The amount of tokens claimable
-    function computeClaimableTokenAmount(uint256 snapshot, address token, address champion, uint256 shares)
+    function computeClaimableTokenAmount(uint256 snapshot, address token, address receiver, uint256 shares)
         public
         view
         returns (uint256 claimableTokenAmount)
     {
         claimableTokenAmount =
-            _computeClaimableTokenAmount(snapshot, token, shares, claimedTokens[snapshot][token][champion]);
+            _computeClaimableTokenAmount(snapshot, token, shares, claimedTokens[snapshot][token][receiver]);
     }
 
     /// -----------------------------------------------------------------------
     /// Internal utilities
     /// -----------------------------------------------------------------------
 
-    /// @dev Reverts if the sender isn't the champion or does not own the champion claim right
-    /// @param champion The champion whose ownership will be verified
-    function _verifyChampionOwnership(address champion) internal view {
+    /// @dev Reverts if the sender isn't the receiver or does not own the receiver claim right
+    /// @param receiver The receiver whose ownership will be verified
+    function _verifyReceiverOwnership(address receiver) internal view {
         {
-            address rightsOwner = championClaimRightOwner[champion];
+            address rightsOwner = receiverClaimRightOwner[receiver];
             if (
-                // claim right not transferred, sender should be the champion
-                (rightsOwner == address(0) && msg.sender != champion)
+                // claim right not transferred, sender should be the receiver
+                (rightsOwner == address(0) && msg.sender != receiver)
                 // claim right transferred, sender should be the owner
                 || msg.sender != rightsOwner
             ) {
@@ -235,37 +205,17 @@ contract SupaShrine is ReentrancyGuard {
     }
 
     /// @dev See {computeClaimableTokenAmount}
-    function _computeClaimableTokenAmount(uint256 snapshot, address token, uint256 shares, uint256 claimedTokenAmount)
-        internal
-        view
-        returns (uint256 claimableTokenAmount)
-    {
-        uint256 totalShares = source.totalSupplyAt(snapshot);
-        uint256 offeredTokenAmount = (offeredTokens[snapshot][token] * shares) / totalShares;
+    function _computeClaimableTokenAmount(
+        uint256 snapshot,
+        address claimToken,
+        uint256 shares,
+        uint256 claimedTokenAmount
+    ) internal view returns (uint256 claimableTokenAmount) {
+        uint256 totalShares = SupaERC20(claimToken).totalSupplyAt(snapshot);
+        uint256 offeredTokenAmount = (rewardedTokens[claimToken][snapshot] * shares) / totalShares;
 
         // rounding may cause (offeredTokenAmount < claimedTokenAmount)
         // don't want to revert because of it
         claimableTokenAmount = offeredTokenAmount >= claimedTokenAmount ? offeredTokenAmount - claimedTokenAmount : 0;
-    }
-
-    /// @dev See {claimFromMetaShrine}
-    function _claimFromMetaShrine(MetaShrineClaimInfo calldata claimInfo)
-        internal
-        returns (uint256 claimedTokenAmount)
-    {
-        // claim tokens from the meta shrine
-        IERC20 token = IERC20(claimInfo.token);
-        uint256 beforeBalance = token.balanceOf(address(this));
-        claimInfo.metaShrine.claim(
-            address(this),
-            ClaimInfo({snapshotId: claimInfo.snapshotId, token: claimInfo.token, champion: address(this)})
-        );
-        claimedTokenAmount = token.balanceOf(address(this)) - beforeBalance;
-
-        // distribute tokens to Champions
-        offeredTokens[snapshotId][claimInfo.token] += claimedTokenAmount;
-
-        emit Offer(address(claimInfo.metaShrine), claimInfo.token, claimedTokenAmount);
-        emit ClaimFromMetaShrine(claimInfo.metaShrine);
     }
 }
