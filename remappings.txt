@@ -1,5 +1,5 @@
 @script/=script/
-@openzeppelin/=node_modules/@openzeppelin/
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
 @solidstate/=lib/solidstate-solidity/contracts/
 @eas/=lib/eas-contracts/contracts/
 @recoverable/=lib/recoverable-wrapper/contracts/
