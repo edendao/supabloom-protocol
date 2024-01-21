@@ -15,9 +15,10 @@ contract SupaController {
         bool minted;
     }
 
-    // TODO: rename this
     mapping(bytes32 schemaUID => mapping(address creator => TokenData data))
-        public claimTokenData;
+        public tokenData;
+    mapping(bytes32 claimAttestationID => address TokenClaimed)
+        public claimsToTokens;
     // The address of the global EAS contract.
     IEAS public immutable eas;
     mapping(address approved => address admin) public operators;
@@ -37,11 +38,11 @@ contract SupaController {
     ) external returns (address token) {
         // Check if the token is already deployed by the msg.sender
         require(
-            claimTokenData[schemaUID][msg.sender].token == address(0),
+            tokenData[schemaUID][msg.sender].token == address(0),
             "Token Already Deployed"
         );
         token = address(new SupaERC20(name, symbol, address(this)));
-        claimTokenData[schemaUID][msg.sender] = TokenData({
+        tokenData[schemaUID][msg.sender] = TokenData({
             name: name,
             symbol: symbol,
             token: token,
@@ -61,16 +62,19 @@ contract SupaController {
 
         address admin = operators[msg.sender];
         require(
-            claimTokenData[attestation.schema][admin].token != address(0),
+            tokenData[attestation.schema][admin].token != address(0),
             "Token Not Deployed"
         );
         require(
-            claimTokenData[attestation.schema][admin].minted == false,
+            tokenData[attestation.schema][admin].minted == false,
             "Token Already Minted"
         );
 
-        claimTokenData[attestation.schema][admin].minted = true;
-        ISupaERC20(claimTokenData[attestation.schema][admin].token).mint(
+        tokenData[attestation.schema][admin].minted = true;
+        claimsToTokens[claimAttestationID] = tokenData[attestation.schema][
+            admin
+        ].token;
+        ISupaERC20(tokenData[attestation.schema][admin].token).mint(
             receiver,
             abi.decode(attestation.data, (uint256))
         );

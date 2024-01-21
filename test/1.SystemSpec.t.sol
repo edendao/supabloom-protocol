@@ -127,21 +127,62 @@ contract SystemSpecTest is TestSystem {
         controller.claim(claimAttestationUID, address(this));
     }
 
-    function testRewarding() public {
-        // PART 1 — CLAIMING ==================
+    function _testClaim() internal returns (bytes32 claimAttestationUID) {
         // create a claim attestation with EAS
+        uint256 amount = 12 ether;
+        claimAttestationUID = eas.attest(
+            AttestationRequest({
+                schema: claimSchemaUID,
+                data: AttestationRequestData({
+                    recipient: address(0), // No recipient
+                    expirationTime: NO_EXPIRATION_TIME, // No expiration time
+                    revocable: false,
+                    refUID: EMPTY_UID, // No references UI
+                    data: abi.encode(amount), // Encode a single uint256 as a parameter to the schema
+                    value: 0 // No value/ETH
+                })
+            })
+        );
+
         // controller.claim(claimAttestationID, address receiver)
         //    this mints claim ERC20s to the receiver address, for this test, use address(this) (this test contract)
+        controller.claim(claimAttestationUID, address(this));
+    }
+
+    function testRewarding() public {
+        bytes32 claimAttestationUID = _testClaim();
+        address user1 = makeAddr("user1");
+        address user2 = makeAddr("user2");
+        address user3 = makeAddr("user3");
+
         // distribute some claim ERC20s to 3 addresses
+        ISupaERC20(claimToken).transfer(user1, 4 ether);
+        ISupaERC20(claimToken).transfer(user2, 4 ether);
+        ISupaERC20(claimToken).transfer(user3, 4 ether);
+        assert(ISupaERC20(claimToken).balanceOf(user1) == 4 ether);
+        assert(ISupaERC20(claimToken).balanceOf(user2) == 4 ether);
+        assert(ISupaERC20(claimToken).balanceOf(user3) == 4 ether);
 
         // PART 2 — Rewarding ==============
         // create a "reward attestation" on EAS => this is an attestation with refUID = claimAttestationID
+        uint256 amount = 21 ether;
+        bytes32 rewardAttestationUID = eas.attest(
+            AttestationRequest({
+                schema: validationSchemaUID,
+                data: AttestationRequestData({
+                    recipient: address(0), // No recipient
+                    expirationTime: NO_EXPIRATION_TIME, // No expiration time
+                    revocable: false,
+                    refUID: claimAttestationUID, // No references UI
+                    data: abi.encode(amount), // Encode a single uint256 as a parameter to the schema
+                    value: 0 // No value/ETH
+                })
+            })
+        );
         // controller.reward(rewardAttestationID, uint256 rewardAmount)
         //    this mints credit `rewardAmount` ERC20s, and calls SupaShrine.reward(claimERC20Token, creditERC20Token, rewardAmount)
-
         // assert that a new snapshot was taken of the claimToken ERC20
         // assert that the various holders of the claimToken ERC20s can claim their pro-rata reward
-
         // prank the holders and claim the reward tokens
         // assert they got what they should have got
     }
