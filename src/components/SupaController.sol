@@ -1,6 +1,7 @@
 pragma solidity 0.8.21;
 
-import { ISupaERC20 } from "./ISupaERC20.sol";
+import { ISupaERC20 } from "./interfaces/ISupaERC20.sol";
+import { ISupaShrine } from "./interfaces/ISupaShrine.sol";
 import { SupaERC20 } from "./SupaERC20.sol";
 import { IEAS } from "@eas/IEAS.sol";
 import { Attestation } from "@eas/Common.sol";
@@ -15,20 +16,22 @@ contract SupaController {
         bool minted;
     }
 
+    address public supaShrine;
+    // The address of the global EAS contract.
+    IEAS public immutable eas;
     mapping(bytes32 schemaUID => mapping(address creator => TokenData data))
         public tokenData;
     mapping(bytes32 claimAttestationID => address TokenClaimed)
-        public claimsToTokens;
-    // The address of the global EAS contract.
-    IEAS public immutable eas;
+        public claimedTokens;
     mapping(address approved => address admin) public operators;
 
-    constructor(IEAS _eas) {
+    constructor(IEAS _eas, address _supaShrine) {
         if (address(_eas) == address(0)) {
             revert InvalidEAS();
         }
 
         eas = _eas;
+        supaShrine = _supaShrine;
     }
 
     function registerSchema(
@@ -71,12 +74,49 @@ contract SupaController {
         );
 
         tokenData[attestation.schema][admin].minted = true;
-        claimsToTokens[claimAttestationID] = tokenData[attestation.schema][
-            admin
-        ].token;
+        claimedTokens[claimAttestationID] = tokenData[attestation.schema][admin]
+            .token;
         ISupaERC20(tokenData[attestation.schema][admin].token).mint(
             receiver,
             abi.decode(attestation.data, (uint256))
+        );
+    }
+
+    function reward(bytes32 rewardAttestationID, address receiver) external {
+        Attestation memory attestation = eas.getAttestation(
+            rewardAttestationID
+        );
+        address admin = operators[msg.sender];
+
+        // check that attestation is non-revocable
+        require(
+            attestation.revocable == false,
+            "Only non-revocable attestations"
+        );
+        require(
+            tokenData[attestation.schema][admin].token != address(0),
+            "Token Not Deployed"
+        );
+        require(
+            tokenData[attestation.schema][admin].minted == false,
+            "Token Already Minted"
+        );
+
+        uint256 rewardAmount = abi.decode(attestation.data, (uint256));
+        tokenData[attestation.schema][admin].minted = true;
+        ISupaERC20(tokenData[attestation.schema][admin].token).mint(
+            receiver,
+            rewardAmount
+        );
+        ISupaERC20(tokenData[attestation.schema][admin].token).approve(
+            supaShrine,
+            rewardAmount
+        );
+        require(claimedTokens[attestation.refUID] != address(0), "No Claim");
+        ISupaShrine(supaShrine).reward(
+            claimedTokens[attestation.refUID],
+            tokenData[attestation.schema][admin].token,
+            rewardAmount
         );
     }
 

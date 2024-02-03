@@ -7,6 +7,9 @@ import {
     ReentrancyGuard
 } from "@solidstate/security/reentrancy_guard/ReentrancyGuard.sol";
 import { SupaERC20 } from "./SupaERC20.sol";
+import { ISupaERC20 } from "./interfaces/ISupaERC20.sol";
+
+import "forge-std/console.sol";
 
 /// @title SupaShrine
 /// @author zefram.eth, cyrusofeden.eth, tabish.eth
@@ -90,7 +93,7 @@ contract SupaShrine is ReentrancyGuard {
         uint256 rewardAmount
     ) external {
         // distribute tokens to Receivers
-        uint256 snapshotId = SupaERC20(claimToken).incrementSnapshot();
+        uint256 snapshotId = ISupaERC20(claimToken).incrementSnapshot();
         rewardedTokens[claimToken][snapshotId][rewardToken] += rewardAmount;
         // transfer tokens from sender
         SafeTransferLib.safeTransferFrom(
@@ -121,10 +124,8 @@ contract SupaShrine is ReentrancyGuard {
             claimInfo.claimToken
         ][claimInfo.snapshotId][claimInfo.rewardToken][claimInfo.receiver];
 
-        uint256 claimTokenBalance = SupaERC20(claimInfo.claimToken).balanceOfAt(
-            claimInfo.receiver,
-            claimInfo.snapshotId
-        );
+        uint256 claimTokenBalance = ISupaERC20(claimInfo.claimToken)
+            .balanceOfAt(claimInfo.receiver, claimInfo.snapshotId);
 
         claimedRewardTokenAmount = _computeClaimableTokenAmount(
             claimInfo.snapshotId,
@@ -226,13 +227,12 @@ contract SupaShrine is ReentrancyGuard {
         {
             address rightsOwner = receiverClaimRightOwner[receiver];
             if (
-                // claim right not transferred, sender should be the receiver
-                (rightsOwner == address(0) && msg.sender != receiver) ||
-                // claim right transferred, sender should be the owner
-                msg.sender != rightsOwner
+                msg.sender == rightsOwner ||
+                (rightsOwner == address(0) && msg.sender == receiver)
             ) {
-                revert NotAuthorized();
+                return;
             }
+            revert NotAuthorized();
         }
     }
 
@@ -244,7 +244,7 @@ contract SupaShrine is ReentrancyGuard {
         uint256 shares,
         uint256 claimedTokenAmount
     ) internal view returns (uint256 claimableTokenAmount) {
-        uint256 totalShares = SupaERC20(claimToken).totalSupplyAt(snapshot);
+        uint256 totalShares = ISupaERC20(claimToken).totalSupplyAt(snapshot);
         uint256 offeredTokenAmount = (rewardedTokens[claimToken][snapshot][
             rewardToken
         ] * shares) / totalShares;

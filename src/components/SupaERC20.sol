@@ -54,7 +54,7 @@ contract SupaERC20 is
     }
 
     function mint(address receiver, uint256 amount) external onlyOwner {
-        ERC20BaseStorage.layout().balances[receiver] += amount;
+        _mint(receiver, amount);
         emit Transfer(address(0), receiver, amount);
     }
 
