@@ -11,7 +11,8 @@ import {
 } from "@eas/IEAS.sol";
 import { NO_EXPIRATION_TIME, EMPTY_UID } from "@eas/Common.sol";
 import { SupaController } from "../src/components/SupaController.sol";
-import { ISupaERC20 } from "../src/components/ISupaERC20.sol";
+import { SupaShrine } from "~/components/SupaShrine.sol";
+import { ISupaERC20 } from "../src/components/interfaces/ISupaERC20.sol";
 
 import "forge-std/console.sol";
 
@@ -26,6 +27,7 @@ contract SystemSpecTest is TestSystem {
         ISchemaRegistry(0xA7b39296258348C78294F95B872b282326A97BDF); // Mainnet Schema Registry
     IEAS eas = IEAS(0xA1207F3BBa224E2c9c3c6D5aF63D0eb1582Ce587); // Mainnet EAS
     SupaController controller;
+    SupaShrine supaShrine;
     bytes32 claimSchemaUID;
     bytes32 validationSchemaUID;
     address claimToken;
@@ -35,9 +37,11 @@ contract SystemSpecTest is TestSystem {
         // Set up a fork of mainnet
         mainnetFork = vm.createFork(MAINNET_RPC_URL);
         vm.selectFork(mainnetFork);
+        // Deploy SupaShrine
+        supaShrine = new SupaShrine();
 
         // Deploy SupaController
-        controller = new SupaController(eas);
+        controller = new SupaController(eas, address(supaShrine));
 
         // Set up a schema for claims with EAS
         claimSchemaUID = schemaRegistry.register(
@@ -155,6 +159,7 @@ contract SystemSpecTest is TestSystem {
         address user2 = makeAddr("user2");
         address user3 = makeAddr("user3");
 
+        assert(ISupaERC20(claimToken).balanceOf(address(this)) == 12 ether);
         // distribute some claim ERC20s to 3 addresses
         ISupaERC20(claimToken).transfer(user1, 4 ether);
         ISupaERC20(claimToken).transfer(user2, 4 ether);
@@ -166,7 +171,7 @@ contract SystemSpecTest is TestSystem {
         // PART 2 — Rewarding ==============
         // create a "reward attestation" on EAS => this is an attestation with refUID = claimAttestationID
         uint256 amount = 21 ether;
-        bytes32 rewardAttestationUID = eas.attest(
+        bytes32 rewardAttestationID = eas.attest(
             AttestationRequest({
                 schema: validationSchemaUID,
                 data: AttestationRequestData({
@@ -179,12 +184,31 @@ contract SystemSpecTest is TestSystem {
                 })
             })
         );
-        // controller.reward(rewardAttestationID, uint256 rewardAmount)
-        //    this mints credit `rewardAmount` ERC20s, and calls SupaShrine.reward(claimERC20Token, creditERC20Token, rewardAmount)
+
+        // Snapshot number before calling reward function
+        uint256 snapshotId = ISupaERC20(claimToken).currentSnapshot();
+
+        // this mints credit `rewardAmount` ERC20s, and calls SupaShrine.reward(claimERC20Token, creditERC20Token, rewardAmount)
+        controller.reward(rewardAttestationID, address(controller));
         // assert that a new snapshot was taken of the claimToken ERC20
+        // Snapshot number before calling reward function
+        uint256 newSnapshotId = ISupaERC20(claimToken).currentSnapshot();
+        assert(newSnapshotId == snapshotId + 1);
+
         // assert that the various holders of the claimToken ERC20s can claim their pro-rata reward
+        SupaShrine.ClaimInfo memory claimInfo = SupaShrine.ClaimInfo(
+            newSnapshotId,
+            claimToken,
+            rewardToken,
+            user1
+        );
+        assert(supaShrine.claimableTokenAmount(claimInfo, 4 ether) == 7 ether);
+
         // prank the holders and claim the reward tokens
+        vm.prank(user1);
+        supaShrine.claim(user1, claimInfo);
         // assert they got what they should have got
+        assert(ISupaERC20(rewardToken).balanceOf(user1) == 7 ether);
     }
 
     function testRewardingIdempotency() public {
