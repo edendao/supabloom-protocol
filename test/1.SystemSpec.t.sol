@@ -17,6 +17,15 @@ import { ISupaERC20 } from "../src/components/interfaces/ISupaERC20.sol";
 import "forge-std/console.sol";
 
 contract SystemSpecTest is TestSystem {
+    event Claim(
+        address recipient,
+        address indexed claimToken,
+        uint256 snapshotId,
+        address indexed token,
+        address indexed receiver,
+        uint256 claimedRewardTokenAmount
+    );
+
     uint256 mainnetFork;
     string MAINNET_RPC_URL = vm.envString("MAINNET_RPC_URL");
     string claimTokenName = "Claim Token";
@@ -212,10 +221,108 @@ contract SystemSpecTest is TestSystem {
     }
 
     function testRewardingIdempotency() public {
+        bytes32 claimAttestationUID = _testClaim();
+        address user1 = makeAddr("user1");
+
+        assert(ISupaERC20(claimToken).balanceOf(address(this)) == 12 ether);
+        // distribute some claim ERC20s to 3 addresses
+        ISupaERC20(claimToken).transfer(user1, 4 ether);
+        assert(ISupaERC20(claimToken).balanceOf(user1) == 4 ether);
+
+        uint256 amount = 21 ether;
+        bytes32 rewardAttestationID = eas.attest(
+            AttestationRequest({
+                schema: validationSchemaUID,
+                data: AttestationRequestData({
+                    recipient: address(0), // No recipient
+                    expirationTime: NO_EXPIRATION_TIME, // No expiration time
+                    revocable: false,
+                    refUID: claimAttestationUID, // No references UI
+                    data: abi.encode(amount), // Encode a single uint256 as a parameter to the schema
+                    value: 0 // No value/ETH
+                })
+            })
+        );
+        controller.reward(rewardAttestationID, address(controller));
+        uint256 newSnapshotId = ISupaERC20(claimToken).currentSnapshot();
+        SupaShrine.ClaimInfo memory claimInfo = SupaShrine.ClaimInfo(
+            newSnapshotId,
+            claimToken,
+            rewardToken,
+            user1
+        );
+        assert(supaShrine.claimableTokenAmount(claimInfo, 4 ether) == 7 ether);
+
+        // prank the holders and claim the reward tokens
+        vm.prank(user1);
+        supaShrine.claim(user1, claimInfo);
+        // assert they got what they should have got
+        assert(ISupaERC20(rewardToken).balanceOf(user1) == 7 ether);
+
         // verify that claimToken holders cannot claim from the shrine more than once
+        vm.prank(user1);
+        vm.expectEmit(true, true, true, true);
+        emit Claim(
+            user1,
+            claimInfo.claimToken,
+            claimInfo.snapshotId,
+            claimInfo.rewardToken,
+            claimInfo.receiver,
+            0
+        );
+        supaShrine.claim(user1, claimInfo);
+        assert(ISupaERC20(rewardToken).balanceOf(user1) == 7 ether);
     }
 
     function testRewardingAcrossSnapshots() public {
         // this is the same as testRewarding() but move tokens around and take a few snapshots between Part 1 and Part 2 and verify that it all works
+
+        bytes32 claimAttestationUID = _testClaim();
+        address user1 = makeAddr("user1");
+
+        assert(ISupaERC20(claimToken).balanceOf(address(this)) == 12 ether);
+        // distribute some claim ERC20s to 3 addresses
+        ISupaERC20(claimToken).transfer(user1, 4 ether);
+        assert(ISupaERC20(claimToken).balanceOf(user1) == 4 ether);
+
+        uint256 amount = 21 ether;
+        bytes32 rewardAttestationID = eas.attest(
+            AttestationRequest({
+                schema: validationSchemaUID,
+                data: AttestationRequestData({
+                    recipient: address(0), // No recipient
+                    expirationTime: NO_EXPIRATION_TIME, // No expiration time
+                    revocable: false,
+                    refUID: claimAttestationUID, // No references UI
+                    data: abi.encode(amount), // Encode a single uint256 as a parameter to the schema
+                    value: 0 // No value/ETH
+                })
+            })
+        );
+        controller.reward(rewardAttestationID, address(controller));
+        address user2 = makeAddr("user2");
+        ISupaERC20(claimToken).transfer(user2, 4 ether);
+        uint256 newSnapshotId = ISupaERC20(claimToken).currentSnapshot();
+        SupaShrine.ClaimInfo memory claimInfo1 = SupaShrine.ClaimInfo(
+            newSnapshotId,
+            claimToken,
+            rewardToken,
+            user1
+        );
+        SupaShrine.ClaimInfo memory claimInfo2 = SupaShrine.ClaimInfo(
+            newSnapshotId,
+            claimToken,
+            rewardToken,
+            user2
+        );
+
+        vm.prank(user1);
+        supaShrine.claim(user1, claimInfo1);
+        assert(ISupaERC20(rewardToken).balanceOf(user1) == 7 ether);
+
+        // user2 still doesn't get reward because snapshot was taken before they  got the tokens
+        vm.prank(user2);
+        supaShrine.claim(user2, claimInfo2);
+        assert(ISupaERC20(rewardToken).balanceOf(user2) == 0 ether);
     }
 }
