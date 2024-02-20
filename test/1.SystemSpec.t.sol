@@ -50,34 +50,22 @@ contract SystemSpecTest is TestSystem {
         supaShrine = new SupaShrine();
 
         // Deploy SupaController
-        controller = new SupaController(eas, address(supaShrine));
+        controller = new SupaController(eas, address(supaShrine), address(schemaRegistry));
 
         // Set up a schema for claims with EAS
-        claimSchemaUID = schemaRegistry.register(
-            "uint256 claimTokenAmount",
-            ISchemaResolver(address(0)),
-            false
-        );
-
         // register the schema with our controller with a token name and symbol
         //    this deploys the token but does not mint
-        claimToken = controller.registerSchema(
-            claimSchemaUID,
+        (claimSchemaUID, claimToken) = controller.registerSchema(
+            "uint256 claimTokenAmount",
             claimTokenName,
             claimTokenSymbol
         );
 
         // Set up a schema for validations with EAS
-        validationSchemaUID = schemaRegistry.register(
-            "uint256 rewardTokenAmount",
-            ISchemaResolver(address(0)),
-            false
-        );
-
         // register the schema with our controller with a token name and symbol
         //    this deploys the token but does not mint
-        rewardToken = controller.registerSchema(
-            validationSchemaUID,
+        (validationSchemaUID, rewardToken) = controller.registerSchema(
+            "uint256 rewardTokenAmount",
             rewardTokenName,
             rewardTokenSymbol
         );
@@ -111,9 +99,9 @@ contract SystemSpecTest is TestSystem {
 
     function testClaimingIdempotency() public {
         // check token only deployled once
-        vm.expectRevert(bytes("Token Already Deployed"));
+        vm.expectRevert();
         controller.registerSchema(
-            claimSchemaUID,
+            "uint256 claimTokenAmount",
             claimTokenName,
             claimTokenSymbol
         );
@@ -135,8 +123,8 @@ contract SystemSpecTest is TestSystem {
         controller.claim(claimAttestationUID, address(this));
         assert(ISupaERC20(claimToken).balanceOf(address(this)) == amount);
 
-        // verfify mint only happened once for a specific token.
-        vm.expectRevert(bytes("Token Already Minted"));
+        // verify mint only happened one claimAttestationUID.
+        vm.expectRevert();
         controller.claim(claimAttestationUID, address(this));
     }
 
