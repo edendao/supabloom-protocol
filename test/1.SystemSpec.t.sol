@@ -56,7 +56,7 @@ contract SystemSpecTest is TestSystem {
         // register the schema with our controller with a token name and symbol
         //    this deploys the token but does not mint
         (claimSchemaUID, claimToken) = controller.registerSchema(
-            "uint256 claimTokenAmount",
+            "uint256 claimTokenAmount, string data",
             claimTokenName,
             claimTokenSymbol
         );
@@ -65,7 +65,7 @@ contract SystemSpecTest is TestSystem {
         // register the schema with our controller with a token name and symbol
         //    this deploys the token but does not mint
         (validationSchemaUID, rewardToken) = controller.registerSchema(
-            "uint256 rewardTokenAmount",
+            "uint256 rewardTokenAmount, string data",
             rewardTokenName,
             rewardTokenSymbol
         );
@@ -74,6 +74,7 @@ contract SystemSpecTest is TestSystem {
     function testClaiming() public {
         // create a claim attestation with EAS
         uint256 amount = 10 ether;
+        string memory data = "data";
         bytes32 claimAttestationUID = eas.attest(
             AttestationRequest({
                 schema: claimSchemaUID,
@@ -82,7 +83,7 @@ contract SystemSpecTest is TestSystem {
                     expirationTime: NO_EXPIRATION_TIME, // No expiration time
                     revocable: false,
                     refUID: EMPTY_UID, // No references UI
-                    data: abi.encode(amount), // Encode a single uint256 as a parameter to the schema
+                    data: abi.encode(amount, data), // Encode a single uint256 as a parameter to the schema
                     value: 0 // No value/ETH
                 })
             })
@@ -101,12 +102,13 @@ contract SystemSpecTest is TestSystem {
         // check token only deployled once
         vm.expectRevert();
         controller.registerSchema(
-            "uint256 claimTokenAmount",
+            "uint256 claimTokenAmount, string data",
             claimTokenName,
             claimTokenSymbol
         );
 
         uint256 amount = 10 ether;
+        string memory data = "data";
         bytes32 claimAttestationUID = eas.attest(
             AttestationRequest({
                 schema: claimSchemaUID,
@@ -115,7 +117,7 @@ contract SystemSpecTest is TestSystem {
                     expirationTime: NO_EXPIRATION_TIME, // No expiration time
                     revocable: false,
                     refUID: EMPTY_UID, // No references UI
-                    data: abi.encode(amount), // Encode a single uint256 as a parameter to the schema
+                    data: abi.encode(amount, data), // Encode a single uint256 as a parameter to the schema
                     value: 0 // No value/ETH
                 })
             })
@@ -131,6 +133,7 @@ contract SystemSpecTest is TestSystem {
     function _testClaim() internal returns (bytes32 claimAttestationUID) {
         // create a claim attestation with EAS
         uint256 amount = 12 ether;
+        string memory data = "data";
         claimAttestationUID = eas.attest(
             AttestationRequest({
                 schema: claimSchemaUID,
@@ -139,7 +142,7 @@ contract SystemSpecTest is TestSystem {
                     expirationTime: NO_EXPIRATION_TIME, // No expiration time
                     revocable: false,
                     refUID: EMPTY_UID, // No references UI
-                    data: abi.encode(amount), // Encode a single uint256 as a parameter to the schema
+                    data: abi.encode(amount, data), // Encode a single uint256 as a parameter to the schema
                     value: 0 // No value/ETH
                 })
             })
@@ -168,6 +171,7 @@ contract SystemSpecTest is TestSystem {
         // PART 2 — Rewarding ==============
         // create a "reward attestation" on EAS => this is an attestation with refUID = claimAttestationID
         uint256 amount = 21 ether;
+        string memory data = "data";
         bytes32 rewardAttestationID = eas.attest(
             AttestationRequest({
                 schema: validationSchemaUID,
@@ -176,7 +180,7 @@ contract SystemSpecTest is TestSystem {
                     expirationTime: NO_EXPIRATION_TIME, // No expiration time
                     revocable: false,
                     refUID: claimAttestationUID, // No references UI
-                    data: abi.encode(amount), // Encode a single uint256 as a parameter to the schema
+                    data: abi.encode(amount, data), // Encode a single uint256 as a parameter to the schema
                     value: 0 // No value/ETH
                 })
             })
@@ -218,6 +222,7 @@ contract SystemSpecTest is TestSystem {
         assert(ISupaERC20(claimToken).balanceOf(user1) == 4 ether);
 
         uint256 amount = 21 ether;
+        string memory data = "data";
         bytes32 rewardAttestationID = eas.attest(
             AttestationRequest({
                 schema: validationSchemaUID,
@@ -226,7 +231,7 @@ contract SystemSpecTest is TestSystem {
                     expirationTime: NO_EXPIRATION_TIME, // No expiration time
                     revocable: false,
                     refUID: claimAttestationUID, // No references UI
-                    data: abi.encode(amount), // Encode a single uint256 as a parameter to the schema
+                    data: abi.encode(amount, data), // Encode a single uint256 as a parameter to the schema
                     value: 0 // No value/ETH
                 })
             })
@@ -274,6 +279,7 @@ contract SystemSpecTest is TestSystem {
         assert(ISupaERC20(claimToken).balanceOf(user1) == 4 ether);
 
         uint256 amount = 21 ether;
+        string memory data = "data";
         bytes32 rewardAttestationID = eas.attest(
             AttestationRequest({
                 schema: validationSchemaUID,
@@ -282,7 +288,7 @@ contract SystemSpecTest is TestSystem {
                     expirationTime: NO_EXPIRATION_TIME, // No expiration time
                     revocable: false,
                     refUID: claimAttestationUID, // No references UI
-                    data: abi.encode(amount), // Encode a single uint256 as a parameter to the schema
+                    data: abi.encode(amount, data), // Encode a single uint256 as a parameter to the schema
                     value: 0 // No value/ETH
                 })
             })

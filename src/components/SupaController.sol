@@ -70,17 +70,17 @@ contract SupaController {
         Attestation memory attestation = eas.getAttestation(claimAttestationID);
 
         /// Checks
-        if(attestation.revocable){
+        if (attestation.revocable) {
             revert RevocableAttestation();
         }
-        if(address(tokens[attestation.schema]) == address(0)){
+        if (address(tokens[attestation.schema]) == address(0)) {
             revert TokenNotDeployed();
         }
         ISupaERC20 token = tokens[attestation.schema];
-        if(!token.hasAllRoles(msg.sender, OPERATOR_ROLE)) {
+        if (!token.hasAllRoles(msg.sender, OPERATOR_ROLE)) {
             revert NotOperator();
         }
-        if(tokenized[claimAttestationID]){
+        if (tokenized[claimAttestationID]) {
             revert Tokenized();
         }
 
@@ -88,38 +88,44 @@ contract SupaController {
         tokenized[claimAttestationID] = true;
         token.mint(
             receiver,
-            abi.decode(attestation.data, (uint256))
+            abi.decode(parseMsgData(attestation.data), (uint256))
         );
     }
 
+
+	/**
+	 * @notice Rewards token from a reward attestation.
+	 * @param rewardAttestationID The reward attestation ID (bytes32).
+	 * @param receiver The receiver address.
+	 */
     function reward(bytes32 rewardAttestationID, address receiver) external {
         Attestation memory attestation = eas.getAttestation(
             rewardAttestationID
         );
         
         /// Checks
-        if(claimedTokens[attestation.refUID] == address(0)){
+        if (claimedTokens[attestation.refUID] == address(0)) {
             revert NotClaimed();
         }
         address claimedToken = claimedTokens[attestation.refUID];
         // check that attestation is non-revocable
-        if(attestation.revocable){
+        if (attestation.revocable) {
             revert RevocableAttestation();
         }
-        if(address(tokens[attestation.schema]) == address(0)){
+        if (address(tokens[attestation.schema]) == address(0)) {
             revert TokenNotDeployed();
         }
         ISupaERC20 token = tokens[attestation.schema];
-        if(!token.hasAllRoles(msg.sender, OPERATOR_ROLE)) {
+        if (!token.hasAllRoles(msg.sender, OPERATOR_ROLE)) {
             revert NotOperator();
         }
-        if(tokenized[rewardAttestationID]){
+        if (tokenized[rewardAttestationID]) {
             revert Tokenized();
         }
 
         tokenized[rewardAttestationID] = true;
 
-        uint256 rewardAmount = abi.decode(attestation.data, (uint256));
+        uint256 rewardAmount = abi.decode(parseMsgData(attestation.data), (uint256));
         token.mint(
             receiver,
             rewardAmount
@@ -136,9 +142,6 @@ contract SupaController {
     }
 
     function parseMsgData(bytes memory data) internal pure returns (bytes memory value_) {
-        assembly {
-            calldatacopy(0x0, 4, 36)
-            value_ := mload(0x0)
-        }
+        value_ = abi.encodePacked(bytes32(data));
     }
 }
