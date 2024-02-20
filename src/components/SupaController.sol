@@ -1,82 +1,92 @@
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.21;
 
+import { Attestation } from "@eas/Common.sol";
+import { SupaERC20 } from "./SupaERC20.sol";
+
+import { IEAS } from "@eas/IEAS.sol";
+import { ISchemaRegistry } from "@eas/ISchemaRegistry.sol";
+import { ISchemaResolver } from "@eas/resolver/ISchemaResolver.sol";
 import { ISupaERC20 } from "./interfaces/ISupaERC20.sol";
 import { ISupaShrine } from "./interfaces/ISupaShrine.sol";
-import { SupaERC20 } from "./SupaERC20.sol";
-import { IEAS } from "@eas/IEAS.sol";
-import { Attestation } from "@eas/Common.sol";
+
+import "forge-std/console.sol";
 
 contract SupaController {
-    error InvalidEAS();
+    error ZeroAddress();
+    error RevocableAttestation();
+    error AlreadyMinted();
+    error TokenNotDeployed();
+    error NotOperator();
+    error Tokenized();
+    error NotClaimed();
 
-    struct TokenData {
-        string name;
-        string symbol;
-        address token;
-        bool minted;
-    }
+    uint256 internal constant OPERATOR_ROLE = 1 << 1;
 
-    address public supaShrine;
-    // The address of the global EAS contract.
-    IEAS public immutable eas;
-    mapping(bytes32 schemaUID => mapping(address creator => TokenData data))
-        public tokenData;
+    ISupaShrine public supaShrine;
+    IEAS public eas;
+    ISchemaRegistry public schemaRegistry;
+
+    mapping(bytes32 schemaUID => ISupaERC20 token) public tokens;
     mapping(bytes32 claimAttestationID => address TokenClaimed)
         public claimedTokens;
-    mapping(address approved => address admin) public operators;
+    mapping(bytes32 attestationId => bool minted) public tokenized;
 
-    constructor(IEAS _eas, address _supaShrine) {
-        if (address(_eas) == address(0)) {
-            revert InvalidEAS();
+    constructor(IEAS _eas, address _supaShrine, address _schemaRegistry) {
+        if (address(_eas) == address(0) || _schemaRegistry == address(0)){
+            revert ZeroAddress();
         }
 
         eas = _eas;
-        supaShrine = _supaShrine;
+        schemaRegistry = ISchemaRegistry(_schemaRegistry);
+        supaShrine = ISupaShrine(_supaShrine);
     }
 
+
+	/**
+	 * @notice Register schema and deploy token
+	 * @param schema The schema (string).
+	 * @param name The name (string).
+	 * @param symbol The symbol (string).
+     * @return schemaUID schemaUID value.
+	 * @return token token address value.
+	 */
     function registerSchema(
-        bytes32 schemaUID,
+        string calldata schema,
         string memory name,
         string memory symbol
-    ) external returns (address token) {
-        // Check if the token is already deployed by the msg.sender
-        require(
-            tokenData[schemaUID][msg.sender].token == address(0),
-            "Token Already Deployed"
-        );
-        token = address(new SupaERC20(name, symbol, address(this)));
-        tokenData[schemaUID][msg.sender] = TokenData({
-            name: name,
-            symbol: symbol,
-            token: token,
-            minted: false
-        });
-        operators[msg.sender] = msg.sender;
+    ) external returns (bytes32 schemaUID, address token) {
+        schemaUID = schemaRegistry.register(schema, ISchemaResolver(address(0)), false);
+        token = address(new SupaERC20{ salt: schemaUID }(name, symbol, msg.sender, address(this)));
+        tokens[schemaUID] = ISupaERC20(token);
     }
 
+	/**
+	 * @notice Claims token from a claim attestation.
+	 * @param claimAttestationID The claim attestation ID (bytes32).
+	 * @param receiver The receiver address.
+	 */
     function claim(bytes32 claimAttestationID, address receiver) external {
         Attestation memory attestation = eas.getAttestation(claimAttestationID);
 
-        // check that attestation is non-revocable
-        require(
-            attestation.revocable == false,
-            "Only non-revocable attestations"
-        );
+        /// Checks
+        if(attestation.revocable){
+            revert RevocableAttestation();
+        }
+        if(address(tokens[attestation.schema]) == address(0)){
+            revert TokenNotDeployed();
+        }
+        ISupaERC20 token = tokens[attestation.schema];
+        if(!token.hasAllRoles(msg.sender, OPERATOR_ROLE)) {
+            revert NotOperator();
+        }
+        if(tokenized[claimAttestationID]){
+            revert Tokenized();
+        }
 
-        address admin = operators[msg.sender];
-        require(
-            tokenData[attestation.schema][admin].token != address(0),
-            "Token Not Deployed"
-        );
-        require(
-            tokenData[attestation.schema][admin].minted == false,
-            "Token Already Minted"
-        );
-
-        tokenData[attestation.schema][admin].minted = true;
-        claimedTokens[claimAttestationID] = tokenData[attestation.schema][admin]
-            .token;
-        ISupaERC20(tokenData[attestation.schema][admin].token).mint(
+        claimedTokens[claimAttestationID] = address(token);
+        tokenized[claimAttestationID] = true;
+        token.mint(
             receiver,
             abi.decode(attestation.data, (uint256))
         );
@@ -86,43 +96,49 @@ contract SupaController {
         Attestation memory attestation = eas.getAttestation(
             rewardAttestationID
         );
-        address admin = operators[msg.sender];
-
+        
+        /// Checks
+        if(claimedTokens[attestation.refUID] == address(0)){
+            revert NotClaimed();
+        }
+        address claimedToken = claimedTokens[attestation.refUID];
         // check that attestation is non-revocable
-        require(
-            attestation.revocable == false,
-            "Only non-revocable attestations"
-        );
-        require(
-            tokenData[attestation.schema][admin].token != address(0),
-            "Token Not Deployed"
-        );
-        require(
-            tokenData[attestation.schema][admin].minted == false,
-            "Token Already Minted"
-        );
+        if(attestation.revocable){
+            revert RevocableAttestation();
+        }
+        if(address(tokens[attestation.schema]) == address(0)){
+            revert TokenNotDeployed();
+        }
+        ISupaERC20 token = tokens[attestation.schema];
+        if(!token.hasAllRoles(msg.sender, OPERATOR_ROLE)) {
+            revert NotOperator();
+        }
+        if(tokenized[rewardAttestationID]){
+            revert Tokenized();
+        }
+
+        tokenized[rewardAttestationID] = true;
 
         uint256 rewardAmount = abi.decode(attestation.data, (uint256));
-        tokenData[attestation.schema][admin].minted = true;
-        ISupaERC20(tokenData[attestation.schema][admin].token).mint(
+        token.mint(
             receiver,
             rewardAmount
         );
-        ISupaERC20(tokenData[attestation.schema][admin].token).approve(
-            supaShrine,
+        token.approve(
+            address(supaShrine),
             rewardAmount
         );
-        require(claimedTokens[attestation.refUID] != address(0), "No Claim");
-        ISupaShrine(supaShrine).reward(
-            claimedTokens[attestation.refUID],
-            tokenData[attestation.schema][admin].token,
+        supaShrine.reward(
+            claimedToken,
+            address(token),
             rewardAmount
         );
     }
 
-    function addOperators(address[] calldata _operators) external {
-        for (uint256 i = 0; i < _operators.length; i++) {
-            operators[_operators[i]] = msg.sender;
+    function parseMsgData(bytes memory data) internal pure returns (bytes memory value_) {
+        assembly {
+            calldatacopy(0x0, 4, 36)
+            value_ := mload(0x0)
         }
     }
 }

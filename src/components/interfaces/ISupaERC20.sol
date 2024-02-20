@@ -23,4 +23,5 @@ interface ISupaERC20 {
     ) external returns (uint256);
 
     function incrementSnapshot() external returns (uint256 newSnapshotId);
+    function hasAllRoles(address user, uint256 roles) external view returns (bool);
 }
