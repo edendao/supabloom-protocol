@@ -2,23 +2,17 @@
 pragma solidity 0.8.21;
 
 import {TestSystem} from "./mixins/TestSystem.sol";
-import { ISchemaRegistry } from "@eas/ISchemaRegistry.sol";
-import { ISchemaResolver } from "@eas/resolver/ISchemaResolver.sol";
-import {
-    IEAS,
-    AttestationRequest,
-    AttestationRequestData
-} from "@eas/IEAS.sol";
-import { NO_EXPIRATION_TIME, EMPTY_UID } from "@eas/Common.sol";
-import { SupaController } from "../src/components/SupaController.sol";
-import { SupaShrine } from "~/components/SupaShrine.sol";
-import { ISupaERC20 } from "../src/components/interfaces/ISupaERC20.sol";
+import {ISchemaRegistry} from "@eas/ISchemaRegistry.sol";
+import {ISchemaResolver} from "@eas/resolver/ISchemaResolver.sol";
+import {IEAS, AttestationRequest, AttestationRequestData} from "@eas/IEAS.sol";
+import {NO_EXPIRATION_TIME, EMPTY_UID} from "@eas/Common.sol";
+import {SupaController} from "../src/components/SupaController.sol";
+import {SupaShrine} from "~/components/SupaShrine.sol";
+import {ISupaERC20} from "../src/components/interfaces/ISupaERC20.sol";
 
 contract ImpactTranchesTest is TestSystem {
-
     uint256 mainnetFork;
     string MAINNET_RPC_URL = vm.envString("MAINNET_RPC_URL");
-
 
     ISchemaRegistry schemaRegistry = ISchemaRegistry(0xA7b39296258348C78294F95B872b282326A97BDF); // Mainnet Schema Registry
     IEAS eas = IEAS(0xA1207F3BBa224E2c9c3c6D5aF63D0eb1582Ce587); // Mainnet EAS
@@ -47,33 +41,20 @@ contract ImpactTranchesTest is TestSystem {
         // Deploy SupaController
         controller = new SupaController(eas, address(supaShrine), address(schemaRegistry));
 
-        (claimSchemaUID1, claimToken1) = controller.registerSchema(
-            "uint256 claimTokenAmount, string data",
-            "Token1",
-            "T1"
-        );
+        (claimSchemaUID1, claimToken1) =
+            controller.registerSchema("uint256 claimTokenAmount, string data", "Token1", "T1");
 
-        (claimSchemaUID2, claimToken2) = controller.registerSchema(
-            "uint256 claimTokenAmount1, string data1",
-            "Token2",
-            "T2"
-        );
+        (claimSchemaUID2, claimToken2) =
+            controller.registerSchema("uint256 claimTokenAmount1, string data1", "Token2", "T2");
 
-        (claimSchemaUID3, claimToken3) = controller.registerSchema(
-            "uint256 claimTokenAmount2, string data2",
-            "Token3",
-            "T3"
-        );
-
+        (claimSchemaUID3, claimToken3) =
+            controller.registerSchema("uint256 claimTokenAmount2, string data2", "Token3", "T3");
 
         // Set up a 'carbon credit' schema for validations with EAS
         // The first 2 fields of the schema should be the token name, and symbol
 
-        (validationSchemaUID, rewardToken) = controller.registerSchema(
-            "uint256 rewardTokenAmount, string data",
-            "Reward Token",
-            "RT"
-        );
+        (validationSchemaUID, rewardToken) =
+            controller.registerSchema("uint256 rewardTokenAmount, string data", "Reward Token", "RT");
     }
 
     function testClaimingTranches() public {
@@ -147,7 +128,7 @@ contract ImpactTranchesTest is TestSystem {
         // create a claim attestation for tranches AAA with EAS with the receiver set to this contract
         // create a claim attestation for tranches AA with EAS with the receiver set to this contract
         // create a claim attestation for tranches A with EAS with the receiver set to this contract
-        
+
         uint256 amount = 12 ether;
         string memory data = "AAA";
         bytes32 claimAttestationUID1 = eas.attest(
@@ -193,7 +174,7 @@ contract ImpactTranchesTest is TestSystem {
                 })
             })
         );
-        
+
         controller.claim(claimAttestationUID1, address(this));
         controller.claim(claimAttestationUID2, address(this));
         controller.claim(claimAttestationUID3, address(this));
@@ -244,12 +225,7 @@ contract ImpactTranchesTest is TestSystem {
         uint256 newSnapshotId = ISupaERC20(claimToken1).currentSnapshot();
         assert(newSnapshotId == snapshotId + 1);
         // assert that the various holders of the claimToken ERC20s can claim their pro-rata reward
-        SupaShrine.ClaimInfo memory claimInfo = SupaShrine.ClaimInfo(
-            newSnapshotId,
-            claimToken1,
-            rewardToken,
-            user1
-        );
+        SupaShrine.ClaimInfo memory claimInfo = SupaShrine.ClaimInfo(newSnapshotId, claimToken1, rewardToken, user1);
         // prank the holders and claim the reward tokens
         vm.prank(user1);
         supaShrine.claim(user1, claimInfo);

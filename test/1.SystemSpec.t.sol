@@ -1,18 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.21;
 
-import { TestSystem } from "./mixins/TestSystem.sol";
-import { ISchemaRegistry } from "@eas/ISchemaRegistry.sol";
-import { ISchemaResolver } from "@eas/resolver/ISchemaResolver.sol";
-import {
-    IEAS,
-    AttestationRequest,
-    AttestationRequestData
-} from "@eas/IEAS.sol";
-import { NO_EXPIRATION_TIME, EMPTY_UID } from "@eas/Common.sol";
-import { SupaController } from "../src/components/SupaController.sol";
-import { SupaShrine } from "~/components/SupaShrine.sol";
-import { ISupaERC20 } from "../src/components/interfaces/ISupaERC20.sol";
+import {TestSystem} from "./mixins/TestSystem.sol";
+import {ISchemaRegistry} from "@eas/ISchemaRegistry.sol";
+import {ISchemaResolver} from "@eas/resolver/ISchemaResolver.sol";
+import {IEAS, AttestationRequest, AttestationRequestData} from "@eas/IEAS.sol";
+import {NO_EXPIRATION_TIME, EMPTY_UID} from "@eas/Common.sol";
+import {SupaController} from "../src/components/SupaController.sol";
+import {SupaShrine} from "~/components/SupaShrine.sol";
+import {ISupaERC20} from "../src/components/interfaces/ISupaERC20.sol";
 
 import "forge-std/console.sol";
 
@@ -32,8 +28,7 @@ contract SystemSpecTest is TestSystem {
     string claimTokenSymbol = "CT";
     string rewardTokenName = "Reward Token";
     string rewardTokenSymbol = "RT";
-    ISchemaRegistry schemaRegistry =
-        ISchemaRegistry(0xA7b39296258348C78294F95B872b282326A97BDF); // Mainnet Schema Registry
+    ISchemaRegistry schemaRegistry = ISchemaRegistry(0xA7b39296258348C78294F95B872b282326A97BDF); // Mainnet Schema Registry
     IEAS eas = IEAS(0xA1207F3BBa224E2c9c3c6D5aF63D0eb1582Ce587); // Mainnet EAS
     SupaController controller;
     SupaShrine supaShrine;
@@ -55,20 +50,14 @@ contract SystemSpecTest is TestSystem {
         // Set up a schema for claims with EAS
         // register the schema with our controller with a token name and symbol
         //    this deploys the token but does not mint
-        (claimSchemaUID, claimToken) = controller.registerSchema(
-            "uint256 claimTokenAmount, string data",
-            claimTokenName,
-            claimTokenSymbol
-        );
+        (claimSchemaUID, claimToken) =
+            controller.registerSchema("uint256 claimTokenAmount, string data", claimTokenName, claimTokenSymbol);
 
         // Set up a schema for validations with EAS
         // register the schema with our controller with a token name and symbol
         //    this deploys the token but does not mint
-        (validationSchemaUID, rewardToken) = controller.registerSchema(
-            "uint256 rewardTokenAmount, string data",
-            rewardTokenName,
-            rewardTokenSymbol
-        );
+        (validationSchemaUID, rewardToken) =
+            controller.registerSchema("uint256 rewardTokenAmount, string data", rewardTokenName, rewardTokenSymbol);
     }
 
     function testClaiming() public {
@@ -101,11 +90,7 @@ contract SystemSpecTest is TestSystem {
     function testClaimingIdempotency() public {
         // check token only deployled once
         vm.expectRevert();
-        controller.registerSchema(
-            "uint256 claimTokenAmount, string data",
-            claimTokenName,
-            claimTokenSymbol
-        );
+        controller.registerSchema("uint256 claimTokenAmount, string data", claimTokenName, claimTokenSymbol);
 
         uint256 amount = 10 ether;
         string memory data = "data";
@@ -197,12 +182,7 @@ contract SystemSpecTest is TestSystem {
         assert(newSnapshotId == snapshotId + 1);
 
         // assert that the various holders of the claimToken ERC20s can claim their pro-rata reward
-        SupaShrine.ClaimInfo memory claimInfo = SupaShrine.ClaimInfo(
-            newSnapshotId,
-            claimToken,
-            rewardToken,
-            user1
-        );
+        SupaShrine.ClaimInfo memory claimInfo = SupaShrine.ClaimInfo(newSnapshotId, claimToken, rewardToken, user1);
         assert(supaShrine.claimableTokenAmount(claimInfo, 4 ether) == 7 ether);
 
         // prank the holders and claim the reward tokens
@@ -238,12 +218,7 @@ contract SystemSpecTest is TestSystem {
         );
         controller.reward(rewardAttestationID, address(controller));
         uint256 newSnapshotId = ISupaERC20(claimToken).currentSnapshot();
-        SupaShrine.ClaimInfo memory claimInfo = SupaShrine.ClaimInfo(
-            newSnapshotId,
-            claimToken,
-            rewardToken,
-            user1
-        );
+        SupaShrine.ClaimInfo memory claimInfo = SupaShrine.ClaimInfo(newSnapshotId, claimToken, rewardToken, user1);
         assert(supaShrine.claimableTokenAmount(claimInfo, 4 ether) == 7 ether);
 
         // prank the holders and claim the reward tokens
@@ -255,14 +230,7 @@ contract SystemSpecTest is TestSystem {
         // verify that claimToken holders cannot claim from the shrine more than once
         vm.prank(user1);
         vm.expectEmit(true, true, true, true);
-        emit Claim(
-            user1,
-            claimInfo.claimToken,
-            claimInfo.snapshotId,
-            claimInfo.rewardToken,
-            claimInfo.receiver,
-            0
-        );
+        emit Claim(user1, claimInfo.claimToken, claimInfo.snapshotId, claimInfo.rewardToken, claimInfo.receiver, 0);
         supaShrine.claim(user1, claimInfo);
         assert(ISupaERC20(rewardToken).balanceOf(user1) == 7 ether);
     }
@@ -297,18 +265,8 @@ contract SystemSpecTest is TestSystem {
         address user2 = makeAddr("user2");
         ISupaERC20(claimToken).transfer(user2, 4 ether);
         uint256 newSnapshotId = ISupaERC20(claimToken).currentSnapshot();
-        SupaShrine.ClaimInfo memory claimInfo1 = SupaShrine.ClaimInfo(
-            newSnapshotId,
-            claimToken,
-            rewardToken,
-            user1
-        );
-        SupaShrine.ClaimInfo memory claimInfo2 = SupaShrine.ClaimInfo(
-            newSnapshotId,
-            claimToken,
-            rewardToken,
-            user2
-        );
+        SupaShrine.ClaimInfo memory claimInfo1 = SupaShrine.ClaimInfo(newSnapshotId, claimToken, rewardToken, user1);
+        SupaShrine.ClaimInfo memory claimInfo2 = SupaShrine.ClaimInfo(newSnapshotId, claimToken, rewardToken, user2);
 
         vm.prank(user1);
         supaShrine.claim(user1, claimInfo1);

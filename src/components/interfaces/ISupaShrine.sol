@@ -10,19 +10,14 @@ interface ISupaShrine {
         address receiver;
     }
 
-    function reward(
-        address claimToken,
-        address rewardToken,
-        uint256 rewardAmount
-    ) external;
+    function reward(address claimToken, address rewardToken, uint256 rewardAmount) external;
 
-    function claim(
-        address recipient,
-        ClaimInfo calldata claimInfo
-    ) external returns (uint256 claimedRewardTokenAmount);
+    function claim(address recipient, ClaimInfo calldata claimInfo)
+        external
+        returns (uint256 claimedRewardTokenAmount);
 
-    function claimableTokenAmount(
-        ClaimInfo calldata claimInfo,
-        uint256 shares
-    ) external view returns (uint256 claimableTokenAmount);
+    function claimableTokenAmount(ClaimInfo calldata claimInfo, uint256 shares)
+        external
+        view
+        returns (uint256 claimableTokenAmount);
 }

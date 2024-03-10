@@ -2,20 +2,15 @@
 pragma solidity 0.8.21;
 
 import {TestSystem} from "./mixins/TestSystem.sol";
-import { ISchemaRegistry } from "@eas/ISchemaRegistry.sol";
-import { ISchemaResolver } from "@eas/resolver/ISchemaResolver.sol";
-import {
-    IEAS,
-    AttestationRequest,
-    AttestationRequestData
-} from "@eas/IEAS.sol";
-import { NO_EXPIRATION_TIME, EMPTY_UID } from "@eas/Common.sol";
-import { SupaController } from "../src/components/SupaController.sol";
-import { SupaShrine } from "~/components/SupaShrine.sol";
-import { ISupaERC20 } from "../src/components/interfaces/ISupaERC20.sol";
+import {ISchemaRegistry} from "@eas/ISchemaRegistry.sol";
+import {ISchemaResolver} from "@eas/resolver/ISchemaResolver.sol";
+import {IEAS, AttestationRequest, AttestationRequestData} from "@eas/IEAS.sol";
+import {NO_EXPIRATION_TIME, EMPTY_UID} from "@eas/Common.sol";
+import {SupaController} from "../src/components/SupaController.sol";
+import {SupaShrine} from "~/components/SupaShrine.sol";
+import {ISupaERC20} from "../src/components/interfaces/ISupaERC20.sol";
 
 contract MultiDimensionalImpactCreditsTest is TestSystem {
-
     uint256 mainnetFork;
     string MAINNET_RPC_URL = vm.envString("MAINNET_RPC_URL");
 
@@ -32,7 +27,6 @@ contract MultiDimensionalImpactCreditsTest is TestSystem {
     address rewardToken2;
 
     function setUp() public {
-
         // Set up a fork of mainnet
         mainnetFork = vm.createFork(MAINNET_RPC_URL);
         vm.selectFork(mainnetFork);
@@ -44,27 +38,18 @@ contract MultiDimensionalImpactCreditsTest is TestSystem {
 
         // Set up a schema for claims with EAS
         // The first 2 fields of the schema should be the token name, symbol
-        (claimSchemaUID, claimToken) = controller.registerSchema(
-            "uint256 claimTokenAmount, string data",
-            "Token1",
-            "T1"
-        );
+        (claimSchemaUID, claimToken) =
+            controller.registerSchema("uint256 claimTokenAmount, string data", "Token1", "T1");
 
         // Set up a 'carbon credit' schema for validations with EAS
         // The first 2 fields of the schema should be the token name, and symbol
-        (carbonCreditSchemaUID, rewardToken1) = controller.registerSchema(
-            "uint256 rewardTokenAmount, string data",
-            "Reward Token",
-            "RT"
-        );
+        (carbonCreditSchemaUID, rewardToken1) =
+            controller.registerSchema("uint256 rewardTokenAmount, string data", "Reward Token", "RT");
 
         // Set up a 'biodiversity credit' schema for validations with EAS
         // The first 2 fields of the schema should be the token name, and symbol
-        (biodiversitySchemaUID, rewardToken2) = controller.registerSchema(
-            "uint256 rewardTokenAmount1, string data1",
-            "Reward Token 1",
-            "RT1"
-        );
+        (biodiversitySchemaUID, rewardToken2) =
+            controller.registerSchema("uint256 rewardTokenAmount1, string data1", "Reward Token 1", "RT1");
     }
 
     function testClaimingFutureImpact() public {
@@ -139,7 +124,7 @@ contract MultiDimensionalImpactCreditsTest is TestSystem {
             })
         );
 
-         // Snapshot number before calling reward function
+        // Snapshot number before calling reward function
         uint256 snapshotId = ISupaERC20(claimToken).currentSnapshot();
 
         // this mints credit `rewardAmount` ERC20s, and calls SupaShrine.reward(claimERC20Token, creditERC20Token, rewardAmount)
@@ -149,16 +134,11 @@ contract MultiDimensionalImpactCreditsTest is TestSystem {
         uint256 newSnapshotId = ISupaERC20(claimToken).currentSnapshot();
         assert(newSnapshotId == snapshotId + 1);
         // assert that the various holders of the claimToken ERC20s can claim their pro-rata reward
-        SupaShrine.ClaimInfo memory claimInfo = SupaShrine.ClaimInfo(
-            newSnapshotId,
-            claimToken,
-            rewardToken1,
-            address(this)
-        );
+        SupaShrine.ClaimInfo memory claimInfo =
+            SupaShrine.ClaimInfo(newSnapshotId, claimToken, rewardToken1, address(this));
         supaShrine.claim(address(this), claimInfo);
         // assert they got what they should have got
         assert(ISupaERC20(rewardToken1).balanceOf(address(this)) == 21 ether);
-
 
         // distribute some of the Claim ERC20s to some addresses
         address user1 = makeAddr("user1");
@@ -183,12 +163,7 @@ contract MultiDimensionalImpactCreditsTest is TestSystem {
         snapshotId = ISupaERC20(claimToken).currentSnapshot();
         controller.reward(rewardAttestationID2, address(controller));
         newSnapshotId = ISupaERC20(claimToken).currentSnapshot();
-        claimInfo = SupaShrine.ClaimInfo(
-            newSnapshotId,
-            claimToken,
-            rewardToken2,
-            user1
-        );
+        claimInfo = SupaShrine.ClaimInfo(newSnapshotId, claimToken, rewardToken2, user1);
         // verify that a new snapshot was taken of the claim's ERC20
         // verify that the current holders of the claim ERC20s can claim their pro-rata reward
         vm.prank(user1);

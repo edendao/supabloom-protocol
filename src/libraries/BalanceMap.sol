@@ -20,9 +20,7 @@ library BalanceMap {
         mapping(address key => uint256 index) _indexes;
     }
 
-    function keys(
-        Map storage map
-    ) internal view returns (address[] memory keysOut) {
+    function keys(Map storage map) internal view returns (address[] memory keysOut) {
         unchecked {
             uint256 i = map.entries.length;
             keysOut = new address[](i);
@@ -33,9 +31,7 @@ library BalanceMap {
         }
     }
 
-    function values(
-        Map storage map
-    ) internal view returns (uint64[] memory valuesOut) {
+    function values(Map storage map) internal view returns (uint64[] memory valuesOut) {
         unchecked {
             uint256 i = map.entries.length;
             valuesOut = new uint64[](i);
@@ -46,10 +42,7 @@ library BalanceMap {
         }
     }
 
-    function at(
-        Map storage map,
-        uint64 index
-    ) internal view returns (Entry storage) {
+    function at(Map storage map, uint64 index) internal view returns (Entry storage) {
         if (index >= map.entries.length) {
             revert BalanceMap__IndexOutOfBounds();
         }
@@ -57,10 +50,7 @@ library BalanceMap {
         return map.entries[index];
     }
 
-    function contains(
-        Map storage map,
-        address key
-    ) internal view returns (bool) {
+    function contains(Map storage map, address key) internal view returns (bool) {
         return map._indexes[key] != 0;
     }
 
@@ -68,19 +58,13 @@ library BalanceMap {
         return map.entries.length;
     }
 
-    function _getEntry(
-        Map storage map,
-        uint256 index
-    ) internal view returns (Entry storage) {
+    function _getEntry(Map storage map, uint256 index) internal view returns (Entry storage) {
         unchecked {
             return map.entries[index - 1];
         }
     }
 
-    function getEntry(
-        Map storage map,
-        address key
-    ) internal view returns (Entry storage) {
+    function getEntry(Map storage map, address key) internal view returns (Entry storage) {
         uint256 keyIndex = map._indexes[key];
         if (keyIndex == 0) {
             revert BalanceMap__AddressNotFound();
@@ -96,45 +80,33 @@ library BalanceMap {
         return _getEntry(map, keyIndex).value;
     }
 
-    function set(
-        Map storage map,
-        address key,
-        uint64 value
-    ) internal returns (bool inserted) {
+    function set(Map storage map, address key, uint64 value) internal returns (bool inserted) {
         uint256 keyIndex = map._indexes[key];
 
         if (keyIndex != 0) {
             _getEntry(map, keyIndex).value = value;
             inserted = false;
         } else {
-            map.entries.push(Entry({ key: key, value: value }));
+            map.entries.push(Entry({key: key, value: value}));
             map._indexes[key] = map.entries.length;
             inserted = true;
         }
     }
 
-    function add(
-        Map storage map,
-        address key,
-        uint64 value
-    ) internal returns (bool inserted) {
+    function add(Map storage map, address key, uint64 value) internal returns (bool inserted) {
         uint256 keyIndex = map._indexes[key];
 
         if (keyIndex != 0) {
             _getEntry(map, keyIndex).value += value;
             inserted = false;
         } else {
-            map.entries.push(Entry({ key: key, value: value }));
+            map.entries.push(Entry({key: key, value: value}));
             map._indexes[key] = map.entries.length;
             inserted = true;
         }
     }
 
-    function subtract(
-        Map storage map,
-        address key,
-        uint64 value
-    ) internal returns (bool removed) {
+    function subtract(Map storage map, address key, uint64 value) internal returns (bool removed) {
         uint256 keyIndex = map._indexes[key];
 
         if (keyIndex == 0) {
@@ -162,10 +134,7 @@ library BalanceMap {
         }
     }
 
-    function remove(
-        Map storage map,
-        address key
-    ) internal returns (bool removed) {
+    function remove(Map storage map, address key) internal returns (bool removed) {
         uint256 keyIndex = map._indexes[key];
 
         if (keyIndex == 0) {

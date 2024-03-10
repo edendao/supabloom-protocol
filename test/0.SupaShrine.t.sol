@@ -46,17 +46,13 @@ contract SupaShrineTest is Test {
         // Approve SupaShrine
         rewardToken.approve(address(supaShrine), 1 ether);
         supaShrine.reward(address(claimToken), address(rewardToken), 1 ether);
-        
+
         // check if reward token balance is 0
         assertEq(rewardToken.balanceOf(address(this)), 0);
 
         // claim reward
-        SupaShrine.ClaimInfo memory claimInfo = SupaShrine.ClaimInfo(
-            1,
-            address(claimToken),
-            address(rewardToken),
-            address(this)
-        );
+        SupaShrine.ClaimInfo memory claimInfo =
+            SupaShrine.ClaimInfo(1, address(claimToken), address(rewardToken), address(this));
 
         supaShrine.claim(address(this), claimInfo);
 
