@@ -39,7 +39,7 @@ contract SupaControllerTest is TestSystem {
 
     function testRegisterSchema() public {
         // Register schema and deploy token
-        (bytes32 schemaUID, address token) = controller.registerSchema("schema", "name", "symbol");
+        (, address token) = controller.registerSchema("schema", "name", "symbol");
         assert(token != address(0));
     }
     function testClaim() public { 

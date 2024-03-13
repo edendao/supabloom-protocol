@@ -83,7 +83,7 @@ contract ImpactTranchesTest is TestSystem {
 
         bytes32 claimAttestationUID2 = eas.attest(
             AttestationRequest({
-                schema: claimSchemaUID2,
+                schema: claimSchemaUID1,
                 data: AttestationRequestData({
                     recipient: address(0), // No recipient
                     expirationTime: NO_EXPIRATION_TIME, // No expiration time
@@ -100,7 +100,7 @@ contract ImpactTranchesTest is TestSystem {
 
         bytes32 claimAttestationUID3 = eas.attest(
             AttestationRequest({
-                schema: claimSchemaUID3,
+                schema: claimSchemaUID1,
                 data: AttestationRequestData({
                     recipient: address(0), // No recipient
                     expirationTime: NO_EXPIRATION_TIME, // No expiration time
@@ -118,10 +118,10 @@ contract ImpactTranchesTest is TestSystem {
         assert(ISupaERC20(claimToken1).balanceOf(address(this)) == 10 ether);
 
         controller.claim(claimAttestationUID2, address(this));
-        assert(ISupaERC20(claimToken2).balanceOf(address(this)) == 20 ether);
+        assert(ISupaERC20(claimToken1).balanceOf(address(this)) == 30 ether);
 
         controller.claim(claimAttestationUID3, address(this));
-        assert(ISupaERC20(claimToken3).balanceOf(address(this)) == 30 ether);
+        assert(ISupaERC20(claimToken1).balanceOf(address(this)) == 60 ether);
     }
 
     function testRewardingTranches() public {

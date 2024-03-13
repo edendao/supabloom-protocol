@@ -175,13 +175,13 @@ contract SupaShrine is ReentrancyGuard {
     /// a particular snapshotId
     /// @param claimInfo The info of claim for which the amount is computed for receiver
     /// @param shares The share amount of the Receiver
-    /// @return claimableTokenAmount The amount of tokens claimable
+    /// @return amount The amount of tokens claimable
     function claimableTokenAmount(ClaimInfo calldata claimInfo, uint256 shares)
         public
         view
-        returns (uint256 claimableTokenAmount)
+        returns (uint256 amount)
     {
-        claimableTokenAmount = _computeClaimableTokenAmount(
+        amount = _computeClaimableTokenAmount(
             claimInfo.snapshotId,
             claimInfo.claimToken,
             claimInfo.rewardToken,
@@ -213,12 +213,12 @@ contract SupaShrine is ReentrancyGuard {
         address rewardToken,
         uint256 shares,
         uint256 claimedTokenAmount
-    ) internal view returns (uint256 claimableTokenAmount) {
+    ) internal view returns (uint256 amount) {
         uint256 totalShares = ISupaERC20(claimToken).totalSupplyAt(snapshot);
         uint256 offeredTokenAmount = (rewardedTokens[claimToken][snapshot][rewardToken] * shares) / totalShares;
 
         // rounding may cause (offeredTokenAmount < claimedTokenAmount)
         // don't want to revert because of it
-        claimableTokenAmount = offeredTokenAmount >= claimedTokenAmount ? offeredTokenAmount - claimedTokenAmount : 0;
+        amount = offeredTokenAmount >= claimedTokenAmount ? offeredTokenAmount - claimedTokenAmount : 0;
     }
 }

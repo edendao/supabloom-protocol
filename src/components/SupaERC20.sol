@@ -15,12 +15,14 @@ import {OwnableRoles} from "solady/auth/OwnableRoles.sol";
 
 // TODO: ? USDC Recoverable Token Standard => would be cool => use settled balances
 contract SupaERC20 is ERC20Base, ERC20Extended, ERC20Metadata, ERC20Permit, ERC20Snapshot, OwnableRoles {
-    constructor(string memory name_, string memory symbol_, address owner_, address owner2_) {
+    
+    uint256 internal constant _MINTER_ROLE = 1 << 1;
+    constructor(string memory name_, string memory symbol_, address owner_, address minter_) {
         _setName(name_);
         _setSymbol(symbol_);
         _initializeOwner(owner_);
-        _grantRoles(owner_, _ROLE_1); // grant operator role to owner
-        _grantRoles(owner2_, _ROLE_1); // grant operator role to owner2
+        _grantRoles(owner_, _MINTER_ROLE); // grant operator role to owner
+        _grantRoles(minter_, _MINTER_ROLE); // grant operator role to owner2
     }
 
     function currentSnapshot() public view returns (uint256 snapshotId) {
@@ -31,7 +33,7 @@ contract SupaERC20 is ERC20Base, ERC20Extended, ERC20Metadata, ERC20Permit, ERC2
         newSnapshotId = ERC20SnapshotInternal._snapshot();
     }
 
-    function mint(address receiver, uint256 amount) external onlyRoles(_ROLE_1) {
+    function mint(address receiver, uint256 amount) external onlyRoles(_MINTER_ROLE) {
         _mint(receiver, amount);
         emit Transfer(address(0), receiver, amount);
     }
